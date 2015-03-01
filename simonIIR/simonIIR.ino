@@ -1,6 +1,8 @@
 // a goes to DEN
 // b goes to NUM
 
+#define NUM_SAMPLES 512
+
 unsigned long int last_time;
 
 const short na = 9;
@@ -11,6 +13,8 @@ float y_blue[9] = {0};
 float y_yellow[9] = {0};
 float y_green[9] = {0};
 float y_red[9] = {0};
+
+unsigned int sampled_signal[NUM_SAMPLES];
 
 unsigned long long int blue_bucket = 0;
 unsigned long long int red_bucket = 0;
@@ -62,28 +66,30 @@ void setup(){
   Serial.begin(9600);
 }
 
-void loop(){  
-  last_time = micros();
+void loop(){
+  int j = 0;
+  while(j < NUM_SAMPLES){
+    in = (float)sampled_signal[j];
+    for(int i=nb-1;i>0;i--)
+      x[i]=x[i-1];
+    
+    x[0]=in;
+    
+    IIR(x,y_blue,b_blue,nb,a_blue,na);
+    IIR(x,y_yellow,b_yellow,nb,a_yellow,na);
+    IIR(x,y_green,b_green,nb,a_green,na);
+    IIR(x,y_red,b_red,nb,a_red,na);
+    
+    blue_bucket   += y_blue[0] * y_blue[0];
+    red_bucket    += y_red[0] * y_red[0];
+    yellow_bucket += y_yellow[0] * y_yellow[0];
+    green_bucket  += y_green[0] * y_green[0];
+  }
   
-  for(int i=nb-1;i>0;i--)
-    x[i]=x[i-1];
-  
-  x[0]=in;
-  
-  IIR(in,x,y_blue,b_blue,nb,a_blue,na);
-  IIR(in,x,y_yellow,b_yellow,nb,a_yellow,na);
-  IIR(in,x,y_green,b_green,nb,a_green,na);
-  IIR(in,x,y_red,b_red,nb,a_red,na);
-  
-  blue_bucket   += y_blue[0] * y_blue[0];
-  red_bucket    += y_red[0] * y_red[0];
-  yellow_bucket += y_yellow[0] * y_yellow[0];
-  green_bucket  += y_green[0] * y_green[0];
-  
-  Serial.println(micros()-last_time);
+  sort(blue_bucket,red_bucket,yellow_bucket,green_bucket);
 }
 
-void IIR(float in, float *x, float *y, const float *b, short nb, const float *a, short na)
+void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
 {
   double z1,z2;
   short i;
@@ -98,4 +104,25 @@ void IIR(float in, float *x, float *y, const float *b, short nb, const float *a,
     z2+=y[i]*a[i];
     
   y[0]=(z1-z2);
+}
+
+void sort(a,b,c,d){
+  char highest = 0;
+  char highest_num = 0;
+  
+  highest_num = a;
+  if(b > highest_num){
+    highest_num = b;
+    highest = 1;
+  }
+  if(c > highest_num){
+    highest_num = c;
+    highest = 2;
+  }
+  if(d > highest_num){
+    highest_num = d;
+    highest = 3;
+  }
+  
+  return highest;
 }

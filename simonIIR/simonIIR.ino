@@ -63,6 +63,8 @@ void setup(){
 }
 
 void loop(){  
+  last_time = micros();
+  
   for(int i=nb-1;i>0;i--)
     x[i]=x[i-1];
   
@@ -79,7 +81,6 @@ void loop(){
   green_bucket  += y_green[0] * y_green[0];
   
   Serial.println(micros()-last_time);
-  last_time = micros();
 }
 
 void IIR(float in, float *x, float *y, const float *b, short nb, const float *a, short na)

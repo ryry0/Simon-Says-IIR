@@ -1,7 +1,14 @@
 // a goes to DEN
 // b goes to NUM
 
+#define NO_PRESCALING 0x01
+#define PRESCALE_8    0x02
+#define PRESCALE_64   0x03
+
+#define CTC_MATCH 2000 //*should* run the interrupt at 1kHz
+
 #define NUM_SAMPLES 512
+#define SAMPLE_PIN  A0
 
 unsigned long int last_time;
 
@@ -14,14 +21,16 @@ float y_yellow[9] = {0};
 float y_green[9] = {0};
 float y_red[9] = {0};
 
-unsigned int sampled_signal[NUM_SAMPLES];
+unsigned int sampled_signal[NUM_SAMPLES] = {0};
+volatile bool  sample_flag = false;
 
-unsigned long long int blue_bucket = 0;
-unsigned long long int red_bucket = 0;
-unsigned long long int yellow_bucket = 0;
-unsigned long long int green_bucket = 0;
+unsigned long int blue_bucket = 0;
+unsigned long int red_bucket = 0;
+unsigned long int yellow_bucket = 0;
+unsigned long int green_bucket = 0;
 
-float in = 5;
+float in = 0;
+int color;
 
 const float b_blue[9] = { //x coeff
   0.0005291156704,-0.0008445017156, 0.002166110324,-0.002284691436,  0.00326248887,
@@ -62,11 +71,52 @@ const float a_green[9] = {
        40.0291214,    20.73347855,    6.358115673,   0.8876139522
 };
 
+void IIR(float in, float *x, float *y, const float *b, short nb, const float *a, short na);
+int sort(unsigned long int a, unsigned long int b, unsigned long int c, unsigned long int d);
+
+//interrupt handler for the timer compare
+ISR(TIMER1_COMPA_vect) {
+  static unsigned int index = 0;
+  if (sample_flag) {
+    //Serial.println(index);
+    sampled_signal[index++] = analogRead(SAMPLE_PIN);
+    if (index >= NUM_SAMPLES) {
+      index = 0;
+      sample_flag = false;
+    }
+  }
+} //end interrupt handler
+
 void setup(){
+  noInterrupts();
   Serial.begin(9600);
+
+  //configure the timer interrupt
+  TCCR1A = 0;
+  TCCR1B = PRESCALE_8; //sets the prescaler to 8
+  TCNT1  = 0;             //resets the timer
+
+  OCR1A = CTC_MATCH;
+  TCCR1B |= (0x01 << WGM12);  //enables CTC mode
+  TIMSK1 |= (0x01 << OCIE1A); //enables the interrupt CTC interrupt
+  
+  interrupts();
 }
 
 void loop(){
+  blue_bucket   =0;
+  red_bucket    =0;
+  yellow_bucket =0;
+  green_bucket  =0;
+  
+  while(!Serial.available());
+  sample_flag = true;
+  while(sample_flag){
+    //Serial.println(sample_flag);
+  }
+  //Serial.println("R");
+  
+  
   int j = 0;
   while(j < NUM_SAMPLES){
     in = (float)sampled_signal[j];
@@ -84,31 +134,60 @@ void loop(){
     red_bucket    += y_red[0] * y_red[0];
     yellow_bucket += y_yellow[0] * y_yellow[0];
     green_bucket  += y_green[0] * y_green[0];
+    
+    //Serial.println(j);
+    j++;
   }
   
-  sort(blue_bucket,red_bucket,yellow_bucket,green_bucket);
+  color = sort(blue_bucket,red_bucket,yellow_bucket,green_bucket);
+  //Serial.print("Color: ");
+  //Serial.println(color);
+  
+  Serial.print("Blue: ");
+  Serial.println(blue_bucket);
+  Serial.print("Red: ");
+  Serial.println(red_bucket);
+  Serial.print("Green: ");
+  Serial.println(green_bucket);
+  Serial.print("Yellow: ");
+  Serial.println(yellow_bucket);
+  
+  if(color == 0){
+    Serial.println("Blue");
+  }
+  else if(color == 1){
+    Serial.println("Red");
+  }
+  else if(color == 2){
+    Serial.println("Yellow");
+  }
+  else if(color == 3){
+    Serial.println("Green");
+  }
+  
+  //while(Serial.available()) Serial.read();
 }
 
 void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
 {
   double z1,z2;
   short i;
-  
+
   for(z1=0,i=0;i<nb;i++)
     z1+=x[i]*b[i];
-    
+
   for(i=na-1;i>0;i--)
     y[i]=y[i-1];
-  
+
   for(z2=0,i=1;i<na;i++)
     z2+=y[i]*a[i];
-    
+
   y[0]=(z1-z2);
 }
 
-void sort(a,b,c,d){
-  char highest = 0;
-  char highest_num = 0;
+int sort(unsigned long int a,unsigned long int b,unsigned long int c,unsigned long int d){
+  int highest = 0;
+  int highest_num = 0;
   
   highest_num = a;
   if(b > highest_num){

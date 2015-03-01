@@ -62,7 +62,7 @@ void setup(){
   Serial.begin(9600);
 }
 
-void loop(){
+void loop(){  
   for(int i=nb-1;i>0;i--)
     x[i]=x[i-1];
   

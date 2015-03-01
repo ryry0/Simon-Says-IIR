@@ -24,10 +24,10 @@ float y_red[9] = {0};
 unsigned int sampled_signal[NUM_SAMPLES] = {0};
 volatile bool  sample_flag = false;
 
-unsigned long int blue_bucket = 0;
-unsigned long int red_bucket = 0;
-unsigned long int yellow_bucket = 0;
-unsigned long int green_bucket = 0;
+float blue_bucket = 0;
+float red_bucket = 0;
+float yellow_bucket = 0;
+float green_bucket = 0;
 
 float in = 0;
 int color;
@@ -71,8 +71,8 @@ const float a_green[9] = {
        40.0291214,    20.73347855,    6.358115673,   0.8876139522
 };
 
-void IIR(float in, float *x, float *y, const float *b, short nb, const float *a, short na);
-int sort(unsigned long int a, unsigned long int b, unsigned long int c, unsigned long int d);
+void IIR(float *x, float *y, const float *b, short nb, const float *a, short na);
+int sort(float a, float b, float c, float d);
 
 //interrupt handler for the timer compare
 ISR(TIMER1_COMPA_vect) {
@@ -185,9 +185,9 @@ void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
   y[0]=(z1-z2);
 }
 
-int sort(unsigned long int a,unsigned long int b,unsigned long int c,unsigned long int d){
+int sort(float a,float b,float c,float d){
   int highest = 0;
-  int highest_num = 0;
+  float highest_num = 0;
   
   highest_num = a;
   if(b > highest_num){

@@ -1,6 +1,14 @@
 // a goes to DEN
 // b goes to NUM
 
+#define NO_PRESCALING 0x01
+#define PRESCALE_8    0x02
+#define PRESCALE_64   0x03
+
+#define CTC_MATCH 2000 //*should* run the interrupt at 1kHz
+
+#define NUM_SAMPLES 512
+#define SAMPLE_PIN  A0
 unsigned long int last_time;
 
 const short na = 9;
@@ -11,6 +19,9 @@ float y_blue[9] = {0};
 float y_yellow[9] = {0};
 float y_green[9] = {0};
 float y_red[9] = {0};
+
+unsigned int sampled_signal[NUM_SAMPLES] = {0};
+bool  sample_flag = false;
 
 unsigned long long int blue_bucket = 0;
 unsigned long long int red_bucket = 0;
@@ -58,28 +69,50 @@ const float a_green[9] = {
        40.0291214,    20.73347855,    6.358115673,   0.8876139522
 };
 
+void IIR(float in, float *x, float *y, const float *b, short nb, const float *a, short na);
+
+//interrupt handler for the timer compare
+ISR(TIMER1_COMPA_vect) {
+  static unsigned int index = 0;
+  if (sample_flag) {
+    sampled_signal[index++] = analogRead(SAMPLE_PIN);
+    if (index >= NUM_SAMPLES) {
+      index = 0;
+      sample_flag = false;
+    }
+  }
+} //end interrupt handler
+
 void setup(){
   Serial.begin(9600);
+
+  //configure the timer interrupt
+  TCCR1A = 0;
+  TCCR1B = PRESCALE_8; //sets the prescaler to 8
+  TCNT1  = 0;             //resets the timer
+
+  OCR1A = CTC_MATCH;
+  TCCR1B |= (0x01 << WGM12);  //enables CTC mode
+  TIMSK1 |= (0x01 << OCIE1A); //enables the interrupt CTC interrupt
 }
 
-void loop(){  
+void loop(){
   last_time = micros();
-  
   for(int i=nb-1;i>0;i--)
     x[i]=x[i-1];
-  
+
   x[0]=in;
-  
+
   IIR(in,x,y_blue,b_blue,nb,a_blue,na);
   IIR(in,x,y_yellow,b_yellow,nb,a_yellow,na);
   IIR(in,x,y_green,b_green,nb,a_green,na);
   IIR(in,x,y_red,b_red,nb,a_red,na);
-  
+
   blue_bucket   += y_blue[0] * y_blue[0];
   red_bucket    += y_red[0] * y_red[0];
   yellow_bucket += y_yellow[0] * y_yellow[0];
   green_bucket  += y_green[0] * y_green[0];
-  
+
   Serial.println(micros()-last_time);
 }
 
@@ -87,15 +120,15 @@ void IIR(float in, float *x, float *y, const float *b, short nb, const float *a,
 {
   double z1,z2;
   short i;
-  
+
   for(z1=0,i=0;i<nb;i++)
     z1+=x[i]*b[i];
-    
+
   for(i=na-1;i>0;i--)
     y[i]=y[i-1];
-  
+
   for(z2=0,i=1;i<na;i++)
     z2+=y[i]*a[i];
-    
+
   y[0]=(z1-z2);
 }

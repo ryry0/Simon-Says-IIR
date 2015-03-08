@@ -71,7 +71,7 @@ const float a_green[9] = {
        40.0291214,    20.73347855,    6.358115673,   0.8876139522
 };
 
-void IIR(float in, float *x, float *y, const float *b, short nb, const float *a, short na);
+void IIR(float *x, float *y, const float *b, short nb, const float *a, short na);
 int sort(unsigned long int a, unsigned long int b, unsigned long int c, unsigned long int d);
 
 //interrupt handler for the timer compare
@@ -99,7 +99,7 @@ void setup(){
   OCR1A = CTC_MATCH;
   TCCR1B |= (0x01 << WGM12);  //enables CTC mode
   TIMSK1 |= (0x01 << OCIE1A); //enables the interrupt CTC interrupt
-  
+
   interrupts();
 }
 
@@ -108,64 +108,82 @@ void loop(){
   red_bucket    =0;
   yellow_bucket =0;
   green_bucket  =0;
-  
+
   while(!Serial.available());
   sample_flag = true;
   while(sample_flag){
     //Serial.println(sample_flag);
   }
   //Serial.println("R");
-  
-  
+
+  for (int i = 0; i < NUM_SAMPLES; ++i) {
+    Serial.print(i);
+    Serial.print("\t");
+    Serial.print(sampled_signal[i]);
+    Serial.print("\n");
+  }
+
+  Serial.print("----------------\n");
   int j = 0;
   while(j < NUM_SAMPLES){
     in = (float)sampled_signal[j];
     for(int i=nb-1;i>0;i--)
       x[i]=x[i-1];
-    
+
     x[0]=in;
-    
+
     IIR(x,y_blue,b_blue,nb,a_blue,na);
     IIR(x,y_yellow,b_yellow,nb,a_yellow,na);
     IIR(x,y_green,b_green,nb,a_green,na);
     IIR(x,y_red,b_red,nb,a_red,na);
-    
+
     blue_bucket   += y_blue[0] * y_blue[0];
     red_bucket    += y_red[0] * y_red[0];
     yellow_bucket += y_yellow[0] * y_yellow[0];
     green_bucket  += y_green[0] * y_green[0];
-    
-    //Serial.println(j);
+
+    Serial.print(j);
+    Serial.print("\t");
+    Serial.print(y_red[0]);
+    Serial.print("\t");
+    Serial.print(y_yellow[0]);
+    Serial.print("\t");
+    Serial.print(y_blue[0]);
+    Serial.print("\t");
+    Serial.print(y_green[0]);
+    Serial.print("\n");
+
     j++;
   }
-  
+
   color = sort(blue_bucket,red_bucket,yellow_bucket,green_bucket);
-  //Serial.print("Color: ");
-  //Serial.println(color);
-  
+
+  /*
   Serial.print("Blue: ");
   Serial.println(blue_bucket);
-  Serial.print("Red: ");
+  Serial.print("red: ");
   Serial.println(red_bucket);
-  Serial.print("Green: ");
+  Serial.print("green: ");
   Serial.println(green_bucket);
-  Serial.print("Yellow: ");
+  Serial.print("yellow: ");
   Serial.println(yellow_bucket);
-  
-  if(color == 0){
-    Serial.println("Blue");
+
+  switch(color) {
+    case 0:
+      Serial.println("Blue");
+      break;
+    case 1:
+      Serial.println("Red");
+      break;
+    case 2:
+      Serial.println("Yellow");
+      break;
+    case 3:
+      Serial.println("Green");
+      break;
   }
-  else if(color == 1){
-    Serial.println("Red");
-  }
-  else if(color == 2){
-    Serial.println("Yellow");
-  }
-  else if(color == 3){
-    Serial.println("Green");
-  }
-  
-  //while(Serial.available()) Serial.read();
+  */
+  while(Serial.available()) Serial.read();
 }
 
 void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
@@ -188,7 +206,7 @@ void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
 int sort(unsigned long int a,unsigned long int b,unsigned long int c,unsigned long int d){
   int highest = 0;
   int highest_num = 0;
-  
+
   highest_num = a;
   if(b > highest_num){
     highest_num = b;
@@ -202,6 +220,6 @@ int sort(unsigned long int a,unsigned long int b,unsigned long int c,unsigned lo
     highest_num = d;
     highest = 3;
   }
-  
+
   return highest;
 }

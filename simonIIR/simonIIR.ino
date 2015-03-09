@@ -1,6 +1,10 @@
 // a goes to DEN
 // b goes to NUM
 
+#define CHECK_COLOR
+#define OUTPUT_SAMPLES
+//#define CONTINUOUS_SAMPLING
+
 #define NO_PRESCALING 0x01
 #define PRESCALE_8    0x02
 #define PRESCALE_64   0x03
@@ -109,13 +113,17 @@ void loop(){
   yellow_bucket =0;
   green_bucket  =0;
 
+#ifndef CONTINUOUS_SAMPLING
   while(!Serial.available());
+#endif
+
   sample_flag = true;
   while(sample_flag){
     //Serial.println(sample_flag);
   }
   //Serial.println("R");
 
+#ifdef OUTPUT_SAMPLES
   for (int i = 0; i < NUM_SAMPLES; ++i) {
     Serial.print(i);
     Serial.print("\t");
@@ -124,6 +132,8 @@ void loop(){
   }
 
   Serial.print("----------------\n");
+#endif
+
   int j = 0;
   while(j < NUM_SAMPLES){
     in = (float)sampled_signal[j];
@@ -142,6 +152,7 @@ void loop(){
     yellow_bucket += y_yellow[0] * y_yellow[0];
     green_bucket  += y_green[0] * y_green[0];
 
+#ifdef OUTPUT_SAMPLES
     Serial.print(j);
     Serial.print("\t");
     Serial.print(y_red[0]);
@@ -152,13 +163,14 @@ void loop(){
     Serial.print("\t");
     Serial.print(y_green[0]);
     Serial.print("\n");
+#endif
 
     j++;
   }
 
   color = sort(blue_bucket,red_bucket,yellow_bucket,green_bucket);
 
-  /*
+#ifdef CHECK_COLOR
   Serial.print("Blue: ");
   Serial.println(blue_bucket);
   Serial.print("red: ");
@@ -182,7 +194,8 @@ void loop(){
       Serial.println("Green");
       break;
   }
-  */
+#endif
+
   while(Serial.available()) Serial.read();
 }
 

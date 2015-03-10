@@ -18,17 +18,20 @@
 #define PRESCALE_8    0x02
 #define PRESCALE_64   0x03
 
+#define SAMPLE_OFFSET 510
 #define CTC_MATCH 2000 //*should* run the interrupt at 1kHz
 
 #define NUM_SAMPLES 512
 #define SAMPLE_PIN  A0
 
+const int nb = 9;
+
+enum colors_t { RED, BLUE, YELLOW, GREEN };
+
 unsigned long int last_time;
 
 int sampled_signal[NUM_SAMPLES] = {0};
 volatile bool  sample_flag = false;
-
-const int nb = 9;
 
 float x[9] = {0};
 float y_blue_low[9] = {0};
@@ -46,23 +49,23 @@ unsigned long int red_bucket = 0;
 unsigned long int yellow_bucket = 0;
 
 float in = 0;
-int color;
+colors_t color;
 
 //b is numerator a is denominator.
 void IIR(float *x, float *y, const float *b, short nb, const float *a, short na);
-int sort(unsigned long int a, unsigned long int b, unsigned long int c, unsigned long int d);
+colors_t sort(unsigned long int a, unsigned long int b, unsigned long int c, unsigned long int d);
 
 //interrupt handler for the timer compare
 ISR(TIMER1_COMPA_vect) {
   static unsigned int index = 0;
   if (sample_flag) {
     //Serial.println(index);
-    sampled_signal[index++] = analogRead(SAMPLE_PIN) - 510;
+    sampled_signal[index++] = analogRead(SAMPLE_PIN) - SAMPLE_OFFSET;
     if (index >= NUM_SAMPLES) {
       index = 0;
       sample_flag = false;
-    }
-  }
+    } //end if (index >= NUM_SAMPLES)
+  } //end if (sample_flag)
 } //end interrupt handler
 
 void setup(){
@@ -83,21 +86,16 @@ void setup(){
 
 void loop(){
   blue_bucket   = 0;
-  blue_bucket_high  = 0;
   green_bucket  = 0;
-  green_bucket_high = 0;
-  red_bucket        = 0;
-  yellow_bucket     = 0;
+  red_bucket    = 0;
+  yellow_bucket = 0;
 
 #ifndef CONTINUOUS_SAMPLING
   while(!Serial.available());
 #endif
 
   sample_flag = true;
-  while(sample_flag){
-    //Serial.println(sample_flag);
-  }
-  //Serial.println("R");
+  while(sample_flag); //pause execution while sampling
 
 #ifdef OUTPUT_SAMPLES
   for (int i = 0; i < NUM_SAMPLES; ++i) {
@@ -113,20 +111,18 @@ void loop(){
   int j = 0;
   while(j < NUM_SAMPLES){
     in = (float)sampled_signal[j];
-    for(int i=nb-1;i>0;i--)
-      x[i]=x[i-1];
+    for(int i = nb-1;i>0;i--) //shift in the sampled data
+      x[i] = x[i-1];
 
-    x[0]=in;
+    x[0] = in;
 
+    //run the data through the filters
     IIR(x, y_blue_low, BLUE_LOW_NUM, BLUE_LOW_NL, BLUE_LOW_DEN, BLUE_LOW_DL);
-    IIR(x, y_blue_high, BLUE_HIGH_NUM, BLUE_HIGH_NL, BLUE_HIGH_DEN, BLUE_HIGH_DL);
-
-    IIR(x, y_green_low, GREEN_LOW_NUM, GREEN_LOW_NL, GREEN_LOW_DEN, GREEN_LOW_DL);
     IIR(x, y_green_high, GREEN_HIGH_NUM, GREEN_HIGH_NL, GREEN_HIGH_DEN, GREEN_HIGH_DL);
-
     IIR(x, y_red, RED_LOW_NUM, RED_LOW_NL, RED_LOW_DEN, RED_LOW_DL);
     IIR(x, y_yellow, YELLOW_NUM, YELLOW_NL, YELLOW_DEN, YELLOW_DL);
 
+    //get the energy out of each of the filters
     blue_bucket   += y_blue_low[0] * y_blue_low[0];
     red_bucket    += y_red[0] * y_red[0];
     yellow_bucket += y_yellow[0] * y_yellow[0];
@@ -152,29 +148,30 @@ void loop(){
     j++;
   }
 
-  color = sort(blue_bucket,red_bucket,yellow_bucket,green_bucket);
+  //see which energy is highest
+  color = sort(red_bucket,blue_bucket,yellow_bucket,green_bucket);
 
 #ifdef CHECK_COLOR
+  Serial.print("Red: ");
+  Serial.println(red_bucket);
   Serial.print("Blue: ");
   Serial.println(blue_bucket);
-  Serial.print("red: ");
-  Serial.println(red_bucket);
-  Serial.print("green: ");
+  Serial.print("Green: ");
   Serial.println(green_bucket);
-  Serial.print("yellow: ");
+  Serial.print("Yellow: ");
   Serial.println(yellow_bucket);
 
   switch(color) {
-    case 0:
-      Serial.println("Blue");
-      break;
-    case 1:
+    case RED:
       Serial.println("Red");
       break;
-    case 2:
+    case BLUE:
+      Serial.println("Blue");
+      break;
+    case YELLOW:
       Serial.println("Yellow");
       break;
-    case 3:
+    case GREEN:
       Serial.println("Green");
       break;
   }
@@ -201,22 +198,22 @@ void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
   y[0]=(z1-z2);
 }
 
-int sort(unsigned long int a,unsigned long int b,unsigned long int c,unsigned long int d){
-  int highest = 0;
+colors_t sort(unsigned long int a,unsigned long int b,unsigned long int c,unsigned long int d){
+  colors_t highest = RED;
   unsigned long int highest_num = 0;
 
   highest_num = a;
   if(b > highest_num){
     highest_num = b;
-    highest = 1;
+    highest = BLUE;
   }
   if(c > highest_num){
     highest_num = c;
-    highest = 2;
+    highest = YELLOW;
   }
   if(d > highest_num){
     highest_num = d;
-    highest = 3;
+    highest = GREEN;
   }
 
   return highest;

@@ -1,8 +1,17 @@
 // a goes to DEN
 // b goes to NUM
 
+#include "blue_high_348hz.h"
+#include "blue_low_90hz.h"
+#include "green_high_422hz.h"
+#include "green_low_279hz.h"
+#include "red_329hz.h"
+#include "yellow_210hz.h"
+
+#include "red_reallylow.h"
+
 #define CHECK_COLOR
-#define OUTPUT_SAMPLES
+//#define OUTPUT_SAMPLES
 //#define CONTINUOUS_SAMPLING
 
 #define NO_PRESCALING 0x01
@@ -16,65 +25,30 @@
 
 unsigned long int last_time;
 
-const short na = 9;
-const short nb = 9;
-
-float x[9] = {0};
-float y_blue[9] = {0};
-float y_yellow[9] = {0};
-float y_green[9] = {0};
-float y_red[9] = {0};
-
-unsigned int sampled_signal[NUM_SAMPLES] = {0};
+int sampled_signal[NUM_SAMPLES] = {0};
 volatile bool  sample_flag = false;
 
+const int nb = 9;
+
+float x[9] = {0};
+float y_blue_low[9] = {0};
+float y_blue_high[9] = {0};
+float y_green_low[9] = {0};
+float y_green_high[9] = {0};
+float y_red[9] = {0};
+float y_yellow[9] = {0};
+
 unsigned long int blue_bucket = 0;
+unsigned long int blue_bucket_high = 0;
+unsigned long int green_bucket = 0;
+unsigned long int green_bucket_high = 0;
 unsigned long int red_bucket = 0;
 unsigned long int yellow_bucket = 0;
-unsigned long int green_bucket = 0;
 
 float in = 0;
 int color;
 
-const float b_blue[9] = { //x coeff
-  0.0005291156704,-0.0008445017156, 0.002166110324,-0.002284691436,  0.00326248887,
-  -0.002284691436, 0.002166110324,-0.0008445017156,0.0005291156704
-};
-const float a_blue[9] = { //y coeffs
-                1,   -1.767378688,    5.037234783,   -5.476717949,    7.929422379,
-     -5.315847874,    4.745763302,   -1.616050601,   0.8875268102
-};
-
-const float b_yellow[9] = {
-  0.0005034227506,0.0002466906153, 0.001598455361,0.0006247343263, 0.002243153052,
-  0.0006247343263, 0.001598455361,0.0002466906153,0.0005034227506
-};
-
-const float a_yellow[9] = {
-                1,    0.544231236,    3.976155758,     1.59006381,    5.834795952,
-      1.543359637,    3.746161699,   0.4976285994,    0.887517333
-};
-
-const float b_red[9] = {
-  0.0005793659366, 0.001973848324, 0.004431678448,  0.00662337523, 0.007720588706,
-    0.00662337523, 0.004431678448, 0.001973848324,0.0005793659366
-};
-
-const float a_red[9] = {
-                1,    3.753026247,     9.15087986,    14.20672417,    16.64303207,
-      13.78934002,    8.621077538,     3.43173337,    0.887544632
-};
-
-const float b_green[9] = {
-  0.0007984918775, 0.005124222022,  0.01531646121,  0.02786091156,  0.03374225274,
-    0.02786091156,  0.01531646121, 0.005124222022,0.0007984918775
-};
-
-const float a_green[9] = {
-                1,    6.952979088,    22.00747871,    41.24068069,    49.95503998,
-       40.0291214,    20.73347855,    6.358115673,   0.8876139522
-};
-
+//b is numerator a is denominator.
 void IIR(float *x, float *y, const float *b, short nb, const float *a, short na);
 int sort(unsigned long int a, unsigned long int b, unsigned long int c, unsigned long int d);
 
@@ -83,7 +57,7 @@ ISR(TIMER1_COMPA_vect) {
   static unsigned int index = 0;
   if (sample_flag) {
     //Serial.println(index);
-    sampled_signal[index++] = analogRead(SAMPLE_PIN);
+    sampled_signal[index++] = analogRead(SAMPLE_PIN) - 510;
     if (index >= NUM_SAMPLES) {
       index = 0;
       sample_flag = false;
@@ -108,10 +82,12 @@ void setup(){
 }
 
 void loop(){
-  blue_bucket   =0;
-  red_bucket    =0;
-  yellow_bucket =0;
-  green_bucket  =0;
+  blue_bucket   = 0;
+  blue_bucket_high  = 0;
+  green_bucket  = 0;
+  green_bucket_high = 0;
+  red_bucket        = 0;
+  yellow_bucket     = 0;
 
 #ifndef CONTINUOUS_SAMPLING
   while(!Serial.available());
@@ -142,15 +118,19 @@ void loop(){
 
     x[0]=in;
 
-    IIR(x,y_blue,b_blue,nb,a_blue,na);
-    IIR(x,y_yellow,b_yellow,nb,a_yellow,na);
-    IIR(x,y_green,b_green,nb,a_green,na);
-    IIR(x,y_red,b_red,nb,a_red,na);
+    IIR(x, y_blue_low, BLUE_LOW_NUM, BLUE_LOW_NL, BLUE_LOW_DEN, BLUE_LOW_DL);
+    IIR(x, y_blue_high, BLUE_HIGH_NUM, BLUE_HIGH_NL, BLUE_HIGH_DEN, BLUE_HIGH_DL);
 
-    blue_bucket   += y_blue[0] * y_blue[0];
+    IIR(x, y_green_low, GREEN_LOW_NUM, GREEN_LOW_NL, GREEN_LOW_DEN, GREEN_LOW_DL);
+    IIR(x, y_green_high, GREEN_HIGH_NUM, GREEN_HIGH_NL, GREEN_HIGH_DEN, GREEN_HIGH_DL);
+
+    IIR(x, y_red, RED_LOW_NUM, RED_LOW_NL, RED_LOW_DEN, RED_LOW_DL);
+    IIR(x, y_yellow, YELLOW_NUM, YELLOW_NL, YELLOW_DEN, YELLOW_DL);
+
+    blue_bucket   += y_blue_low[0] * y_blue_low[0];
     red_bucket    += y_red[0] * y_red[0];
     yellow_bucket += y_yellow[0] * y_yellow[0];
-    green_bucket  += y_green[0] * y_green[0];
+    green_bucket  += y_green_high[0] * y_green_high[0];
 
 #ifdef OUTPUT_SAMPLES
     Serial.print(j);
@@ -159,9 +139,13 @@ void loop(){
     Serial.print("\t");
     Serial.print(y_yellow[0]);
     Serial.print("\t");
-    Serial.print(y_blue[0]);
+    Serial.print(y_blue_low[0]);
     Serial.print("\t");
-    Serial.print(y_green[0]);
+    Serial.print(y_blue_high[0]);
+    Serial.print("\t");
+    Serial.print(y_green_low[0]);
+    Serial.print("\t");
+    Serial.print(y_green_high[0]);
     Serial.print("\n");
 #endif
 
@@ -199,6 +183,7 @@ void loop(){
   while(Serial.available()) Serial.read();
 }
 
+//b is numerator a is denominator.
 void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
 {
   double z1,z2;
@@ -218,7 +203,7 @@ void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
 
 int sort(unsigned long int a,unsigned long int b,unsigned long int c,unsigned long int d){
   int highest = 0;
-  int highest_num = 0;
+  unsigned long int highest_num = 0;
 
   highest_num = a;
   if(b > highest_num){

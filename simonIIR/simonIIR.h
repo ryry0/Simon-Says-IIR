@@ -1,3 +1,5 @@
+#ifndef SIMONIIR_INO_
+#define SIMONIIR_INO_
 // a goes to DEN
 // b goes to NUM
 
@@ -49,7 +51,6 @@ unsigned long int red_bucket = 0;
 unsigned long int yellow_bucket = 0;
 
 float in = 0;
-colors_t color;
 
 //b is numerator a is denominator.
 void IIR(float *x, float *y, const float *b, short nb, const float *a, short na);
@@ -68,7 +69,7 @@ ISR(TIMER1_COMPA_vect) {
   } //end if (sample_flag)
 } //end interrupt handler
 
-void setup(){
+void sense_color_init(){
   noInterrupts();
   Serial.begin(9600);
 
@@ -84,7 +85,8 @@ void setup(){
   interrupts();
 }
 
-void loop(){
+colors_t sense_color(){
+  colors_t color;
   blue_bucket   = 0;
   green_bucket  = 0;
   red_bucket    = 0;
@@ -177,8 +179,12 @@ void loop(){
   }
 #endif
 
+
+#ifndef CONTINUOUS_SAMPLING
   while(Serial.available()) Serial.read();
-}
+#endif
+  return color;
+} //end sense_color()
 
 //b is numerator a is denominator.
 void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
@@ -218,3 +224,4 @@ colors_t sort(unsigned long int a,unsigned long int b,unsigned long int c,unsign
 
   return highest;
 }
+#endif

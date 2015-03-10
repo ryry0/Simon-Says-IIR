@@ -71,7 +71,6 @@ ISR(TIMER1_COMPA_vect) {
 
 void sense_color_init(){
   noInterrupts();
-  Serial.begin(9600);
 
   //configure the timer interrupt
   TCCR1A = 0;

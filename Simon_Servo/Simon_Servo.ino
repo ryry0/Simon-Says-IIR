@@ -1,4 +1,5 @@
 #include <Servo.h>
+#include "../simonIIR/simonIIR.h"
 
 // Servo pins
 #define ARMSERVO   7
@@ -37,6 +38,7 @@ int command;
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
+  sense_color_init();
   if(readQD(STRAIGHT) > WHITE){
     move_arm(HALFHEIGHT);
     turn(1,STRAIGHT);

@@ -22,7 +22,7 @@
 #define PRESCALE_64   0x03
 
 #define SAMPLE_OFFSET 510
-#define CTC_MATCH 2000 //*should* run the interrupt at 1kHz
+#define CTC_MATCH 250 //*should* run the interrupt at 1kHz
 
 #define NUM_SAMPLES 512
 #define SAMPLE_PIN  A0
@@ -58,7 +58,7 @@ void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
 colors_t sort(unsigned long int a, unsigned long int b, unsigned long int c, unsigned long int d);
 
 //interrupt handler for the timer compare
-ISR(TIMER1_COMPA_vect) {
+ISR(TIMER0_COMPA_vect) {
   static unsigned int index = 0;
   if (sample_flag) {
     //Serial.println(index);
@@ -74,13 +74,13 @@ void sense_color_init(){
   noInterrupts();
 
   //configure the timer interrupt
-  TCCR1A = 0;
-  TCCR1B = PRESCALE_8; //sets the prescaler to 8
-  TCNT1  = 0;             //resets the timer
+  TCCR0A = 0;
+  TCCR0B = PRESCALE_64; //sets the prescaler to 64
+  TCNT0  = 0;             //resets the timer
 
-  OCR1A = CTC_MATCH;
-  TCCR1B |= (0x01 << WGM12);  //enables CTC mode
-  TIMSK1 |= (0x01 << OCIE1A); //enables the interrupt CTC interrupt
+  OCR0A = CTC_MATCH;
+  TCCR0B |= (0x01 << WGM01);  //enables CTC mode
+  TIMSK0 |= (0x01 << OCIE0A); //enables the interrupt CTC interrupt
 
   interrupts();
 }

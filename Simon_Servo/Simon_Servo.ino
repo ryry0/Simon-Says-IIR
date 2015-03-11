@@ -1,5 +1,4 @@
-#include <Servo.h>
-#include "../simonIIR/simonIIR.h"
+#include "simonIIR.h"
 
 // Servo pins
 #define ARMSERVO   7
@@ -13,27 +12,20 @@
 #define WHITE 750
 
 // CR Servo constants
-#define STOP 90
-#define GO   125
+#define STOP 127
+#define GO   200
 
 // Arm Heights
-#define SIMONHEIGHT 90
-#define RUBIKHEIGHT 70
-#define HALFHEIGHT  45
+#define SIMONHEIGHT 127
+#define RUBIKHEIGHT 100
+#define HALFHEIGHT  63
 #define ZEROHEIGHT  0
 
 #define SIMONTIME 4500
 
-// Servos
-Servo Arm;
-Servo End;
-Servo Twist;
-
 // Horizontal position
-colors_t color = 0;
+colors_t color = RED;
 int command;
-
-
 
 void setup() {
   // put your setup code here, to run once:
@@ -72,15 +64,15 @@ void loop() {
 }
 
 void move_arm(int height){
-  Arm.write(height);
+  digitalWrite(ARMSERVO, height);
 }
 
 void turn(int steps, int sensor){
   for(int i = 0; i < steps; i++){
-    Twist.write(GO);
+    digitalWrite(TWISTSERVO, GO);
     while(readQD(sensor) < WHITE);
     while(readQD(sensor) > WHITE);
-    Twist.write(STOP);
+    digitalWrite(TWISTSERVO, STOP);
   }
 }
 
@@ -103,3 +95,4 @@ int readQD(int QRE_PinNum){
 
   return diff;
 }
+

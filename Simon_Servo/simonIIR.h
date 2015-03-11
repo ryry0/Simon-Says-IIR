@@ -1,5 +1,6 @@
 #ifndef SIMONIIR_INO_
 #define SIMONIIR_INO_
+#include <Arduino.h>
 // a goes to DEN
 // b goes to NUM
 

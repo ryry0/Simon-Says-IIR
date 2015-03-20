@@ -1,6 +1,5 @@
 #ifndef SIMONIIR_INO_
 #define SIMONIIR_INO_
-#include <Arduino.h>
 // a goes to DEN
 // b goes to NUM
 
@@ -15,7 +14,7 @@
 
 #define CHECK_COLOR
 //#define OUTPUT_SAMPLES
-//#define CONTINUOUS_SAMPLING
+#define CONTINUOUS_SAMPLING
 
 #define NO_PRESCALING 0x01
 #define PRESCALE_8    0x02
@@ -119,13 +118,15 @@ colors_t sense_color(){
     x[0] = in;
 
     //run the data through the filters
-    IIR(x, y_blue_low, BLUE_LOW_NUM, BLUE_LOW_NL, BLUE_LOW_DEN, BLUE_LOW_DL);
+    //IIR(x, y_blue_low, BLUE_LOW_NUM, BLUE_LOW_NL, BLUE_LOW_DEN, BLUE_LOW_DL);
+    IIR(x, y_blue_high, BLUE_HIGH_NUM, BLUE_HIGH_NL, BLUE_HIGH_DEN, BLUE_HIGH_DL);
     IIR(x, y_green_high, GREEN_HIGH_NUM, GREEN_HIGH_NL, GREEN_HIGH_DEN, GREEN_HIGH_DL);
     IIR(x, y_red, RED_LOW_NUM, RED_LOW_NL, RED_LOW_DEN, RED_LOW_DL);
     IIR(x, y_yellow, YELLOW_NUM, YELLOW_NL, YELLOW_DEN, YELLOW_DL);
 
     //get the energy out of each of the filters
-    blue_bucket   += y_blue_low[0] * y_blue_low[0];
+    //blue_bucket   += y_blue_low[0] * y_blue_low[0];
+    blue_bucket   += y_blue_high[0] * y_blue_high[0];
     red_bucket    += y_red[0] * y_red[0];
     yellow_bucket += y_yellow[0] * y_yellow[0];
     green_bucket  += y_green_high[0] * y_green_high[0];

@@ -1,5 +1,6 @@
 #ifndef SIMONIIR_INO_
 #define SIMONIIR_INO_
+#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
 // a goes to DEN
 // b goes to NUM
 
@@ -9,6 +10,8 @@
 #include "green_low_279hz.h"
 #include "red_329hz.h"
 #include "yellow_210hz.h"
+#include "lowpass1_5k.h"
+#include "highpass1_5k.h"
 
 #include "red_reallylow.h"
 
@@ -21,11 +24,18 @@
 #define PRESCALE_64   0x03
 
 #define SAMPLE_OFFSET 510
-#define CTC_MATCH 250 //*should* run the interrupt at 1kHz
+#define CTC_MATCH 500 //2000//*should* run the interrupt at 1kHz
+//37 works when speaker is aimed at mic
+#define BUCKET_OFFSET 25
+#define BUCKET_NORMALIZE 3
 
 #define NUM_SAMPLES 512
 #define SAMPLE_PIN  A0
+#define SAMPLE_MOD 4
 
+#define AVG_SAMPLES 10
+
+const float AVG_CONST = 1.0/AVG_SAMPLES;
 const int nb = 9;
 
 enum colors_t { RED, BLUE, YELLOW, GREEN };
@@ -34,6 +44,8 @@ unsigned long int last_time;
 
 int sampled_signal[NUM_SAMPLES] = {0};
 volatile bool  sample_flag = false;
+volatile long delta_t = 0;
+volatile int current_sample = 0;
 
 float x[9] = {0};
 float y_blue_low[9] = {0};
@@ -57,30 +69,72 @@ void IIR(float *x, float *y, const float *b, short nb, const float *a, short na)
 colors_t sort(unsigned long int a, unsigned long int b, unsigned long int c, unsigned long int d);
 
 //interrupt handler for the timer compare
-ISR(TIMER0_COMPA_vect) {
-  static unsigned int index = 0;
-  if (sample_flag) {
-    //Serial.println(index);
-    sampled_signal[index++] = analogRead(SAMPLE_PIN) - SAMPLE_OFFSET;
-    if (index >= NUM_SAMPLES) {
-      index = 0;
-      sample_flag = false;
-    } //end if (index >= NUM_SAMPLES)
-  } //end if (sample_flag)
+ISR(TIMER2_COMPA_vect) {
+  static unsigned int index = 0; //circular buffer index
+  char count = 0; //count to get every xth sample
+  //holds both high and low byte of adc, adcl must be read first and adch next
+  unsigned char high = 0, low = 0;
+
+  float low_filter[4] = {0};
+  float high_filter[4] = {0}; //output of low and high
+  float sample_in[4] = {0};
+  float low_bucket = 0;
+  float high_bucket = 0;
+
+  static long start_time = 0;
+
+  start_time = micros();
+
+  if (!sample_flag) { //don't do it when we have a 'hit'
+    // read the adc
+    ADMUX = 0x40;
+    sbi(ADCSRA, ADSC);
+    while (bit_is_set(ADCSRA, ADSC));
+    low = ADCL;
+    high = ADCH;
+    current_sample = ((high << 8) | low) - SAMPLE_OFFSET;
+
+    for(int i = 3; i>0; i--) //shift in the sampled data
+      sample_in[i] = sample_in[i-1];
+
+    sample_in[0] = current_sample;
+
+    //run the filters
+    IIR(sample_in, high_filter, HIGH_NUM, HIGH_NL, HIGH_DEN, HIGH_DL);
+    IIR(sample_in, low_filter, LOW_NUM, LOW_NL, LOW_DEN, LOW_DL);
+
+    high_bucket = AVG_CONST*high_filter[0]*high_filter[0] + (1 - AVG_CONST)*high_bucket;
+    low_bucket = AVG_CONST*low_filter[0]*low_filter[0] + (1 - AVG_CONST)*low_bucket;
+
+    if (low_bucket/BUCKET_NORMALIZE > high_bucket + BUCKET_OFFSET) {
+      sample_flag = true;
+    }
+    if (count == 0) { //take every xth sample
+      sampled_signal[index] = current_sample;
+      if (++index == NUM_SAMPLES)
+        index = 0;
+    }
+  }
+
+  if (++count == 4)
+    count = 0;
+  delta_t = micros() - start_time;
 } //end interrupt handler
 
 void sense_color_init(){
   noInterrupts();
 
   //configure the timer interrupt
-  TCCR0A = 0;
-  TCCR0B = PRESCALE_64; //sets the prescaler to 64
-  TCNT0  = 0;             //resets the timer
+  TCCR2A = 0;
+  TCCR2B = PRESCALE_8; //sets the prescaler
+  TCNT2  = 0;             //resets the timer
 
-  OCR0A = CTC_MATCH;
-  TCCR0B |= (0x01 << WGM01);  //enables CTC mode
-  TIMSK0 |= (0x01 << OCIE0A); //enables the interrupt CTC interrupt
+  OCR2A = CTC_MATCH;
+  TCCR2B |= (0x01 << WGM21);  //enables CTC mode
+  TIMSK2 |= (0x01 << OCIE2A); //enables the interrupt CTC interrupt
 
+  ADCSRA = 0x87;
+  Serial.print("sense_color_init");
   interrupts();
 }
 

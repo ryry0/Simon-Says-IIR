@@ -9,6 +9,8 @@
 #define STRAIGHT 10
 #define ANGLE    11
 
+#define LED_PIN  4
+
 // IRR Sensor Threshold
 #define WHITE 750
 
@@ -74,10 +76,14 @@ void setup() {
     //move_arm(ZEROHEIGHT);
   }
   */
-  Serial.print("init finished");
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+  Serial.print("init finished\n");
 }
 
 void loop() {
+  int temp = 0;
+  long temp1 = 0;
   // put your main code here, to run repeatedly:
   if(Serial.available()){
     command = Serial.read();
@@ -97,8 +103,41 @@ void loop() {
         //Serial.write('D');
         break;
       case 'R':
+        digitalWrite(LED_PIN, LOW);
+        sample_flag = false;
         break;
     }
   }
+
+  if (sample_flag) {
+    digitalWrite(LED_PIN, HIGH);
+    //color = sense_color();
+    delay(1000);
+    sample_flag = false;
+  }
+  else {
+    digitalWrite(LED_PIN, LOW);
+  }
+
+/*
+#if defined(ADCSRB) && defined(MUX5)
+  Serial.print("this and that\n");
+#endif
+  temp = current_sample;
+  temp1 = delta_t;
+  Serial.print(temp);
+  Serial.print(" ");
+  Serial.print(temp1);
+#ifdef analogPinToChannel
+  Serial.print("analogPinToChannel\n");
+#endif
+  Serial.print("\n");
+  */
+  /*
+  digitalWrite(LED_PIN, HIGH);
+  delay(1000);
+  digitalWrite(LED_PIN, LOW);
+  delay(1000);
+  */
 }
 

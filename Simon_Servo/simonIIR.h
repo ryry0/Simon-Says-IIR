@@ -24,10 +24,11 @@
 #define PRESCALE_64   0x03
 
 #define SAMPLE_OFFSET 510
-#define CTC_MATCH 500 //2000//*should* run the interrupt at 1kHz
+#define CTC_MATCH 62 //2000//*should* run the interrupt at 4kHz
 //37 works when speaker is aimed at mic
-#define BUCKET_OFFSET 25
+#define BUCKET_OFFSET 37
 #define BUCKET_NORMALIZE 3
+#define SIGNAL_WAIT 100//250 //500 //waits 2000 more samples after we've found it
 
 #define NUM_SAMPLES 512
 #define SAMPLE_PIN  A0
@@ -74,6 +75,8 @@ ISR(TIMER2_COMPA_vect) {
   char count = 0; //count to get every xth sample
   //holds both high and low byte of adc, adcl must be read first and adch next
   unsigned char high = 0, low = 0;
+  static bool found_signal = false;
+  static int signal_counter = 0;
 
   float low_filter[4] = {0};
   float high_filter[4] = {0}; //output of low and high
@@ -83,9 +86,8 @@ ISR(TIMER2_COMPA_vect) {
 
   static long start_time = 0;
 
-  start_time = micros();
-
   if (!sample_flag) { //don't do it when we have a 'hit'
+    start_time = micros();
     // read the adc
     ADMUX = 0x40;
     sbi(ADCSRA, ADSC);
@@ -107,26 +109,33 @@ ISR(TIMER2_COMPA_vect) {
     low_bucket = AVG_CONST*low_filter[0]*low_filter[0] + (1 - AVG_CONST)*low_bucket;
 
     if (low_bucket/BUCKET_NORMALIZE > high_bucket + BUCKET_OFFSET) {
-      sample_flag = true;
+      found_signal = true;
     }
     if (count == 0) { //take every xth sample
-      sampled_signal[index] = current_sample;
+      sampled_signal[index] = sample_in[0];
       if (++index == NUM_SAMPLES)
         index = 0;
     }
-  }
+    if (found_signal) {
+      if (++signal_counter >= SIGNAL_WAIT) { //waited for 2000 more signals
+        signal_counter = 0;
+        found_signal = false;
+        sample_flag = true;
+      }
+    } //end if (found_signal);
 
   if (++count == 4)
     count = 0;
-  delta_t = micros() - start_time;
+
+    delta_t = micros() - start_time;
+  }
 } //end interrupt handler
 
 void sense_color_init(){
-  noInterrupts();
 
   //configure the timer interrupt
   TCCR2A = 0;
-  TCCR2B = PRESCALE_8; //sets the prescaler
+  TCCR2B = PRESCALE_64; //sets the prescaler
   TCNT2  = 0;             //resets the timer
 
   OCR2A = CTC_MATCH;
@@ -149,8 +158,8 @@ colors_t sense_color(){
   while(!Serial.available());
 #endif
 
-  sample_flag = true;
-  while(sample_flag); //pause execution while sampling
+  //sample_flag = true;
+  //while(sample_flag); //pause execution while sampling
 
 #ifdef OUTPUT_SAMPLES
   for (int i = 0; i < NUM_SAMPLES; ++i) {
@@ -232,6 +241,9 @@ colors_t sense_color(){
       Serial.println("Green");
       break;
   }
+  Serial.print(delta_t);
+  Serial.print("\n");
+  Serial.print("\n");
 #endif
 
 

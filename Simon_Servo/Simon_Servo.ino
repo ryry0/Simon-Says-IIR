@@ -111,7 +111,7 @@ void loop() {
 
   if (sample_flag) {
     digitalWrite(LED_PIN, HIGH);
-    //color = sense_color();
+    color = sense_color();
     delay(1000);
     sample_flag = false;
   }

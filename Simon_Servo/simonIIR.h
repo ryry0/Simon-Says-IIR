@@ -10,8 +10,8 @@
 #include "green_low_279hz.h"
 #include "red_329hz.h"
 #include "yellow_210hz.h"
-#include "lowpass1_5k.h"
-#include "highpass1_5k.h"
+#include "shitty_1st_order_lp.h"
+#include "shitty_1st_order_hp.h"
 
 #include "red_reallylow.h"
 
@@ -28,7 +28,7 @@
 //37 works when speaker is aimed at mic
 #define BUCKET_OFFSET 37
 #define BUCKET_NORMALIZE 3
-#define SIGNAL_WAIT 100//250 //500 //waits 2000 more samples after we've found it
+#define SIGNAL_WAIT 250 //100//250 //500 //waits 2000 more samples after we've found it
 
 #define NUM_SAMPLES 512
 #define SAMPLE_PIN  A0
@@ -78,11 +78,15 @@ ISR(TIMER2_COMPA_vect) {
   static bool found_signal = false;
   static int signal_counter = 0;
 
-  float low_filter[4] = {0};
-  float high_filter[4] = {0}; //output of low and high
-  float sample_in[4] = {0};
+  float low_filter[3] = {0};
+  float high_filter[3] = {0}; //output of low and high
+  float low_filter1[3] = {0};
+  float high_filter1[3] = {0}; //output of low and high
+  float sample_in[3] = {0};
   float low_bucket = 0;
   float high_bucket = 0;
+  float low_bucket1 = 0;
+  float high_bucket1 = 0;
 
   static long start_time = 0;
 
@@ -96,7 +100,7 @@ ISR(TIMER2_COMPA_vect) {
     high = ADCH;
     current_sample = ((high << 8) | low) - SAMPLE_OFFSET;
 
-    for(int i = 3; i>0; i--) //shift in the sampled data
+    for(int i = 2; i>0; i--) //shift in the sampled data
       sample_in[i] = sample_in[i-1];
 
     sample_in[0] = current_sample;
@@ -104,9 +108,13 @@ ISR(TIMER2_COMPA_vect) {
     //run the filters
     IIR(sample_in, high_filter, HIGH_NUM, HIGH_NL, HIGH_DEN, HIGH_DL);
     IIR(sample_in, low_filter, LOW_NUM, LOW_NL, LOW_DEN, LOW_DL);
+    IIR(sample_in, high_filter1, HIGH_NUM, HIGH_NL, HIGH_DEN, HIGH_DL);
+    IIR(sample_in, low_filter1, LOW_NUM, LOW_NL, LOW_DEN, LOW_DL);
 
     high_bucket = AVG_CONST*high_filter[0]*high_filter[0] + (1 - AVG_CONST)*high_bucket;
+    high_bucket1 = AVG_CONST*high_filter1[0]*high_filter1[0] + (1 - AVG_CONST)*high_bucket1;
     low_bucket = AVG_CONST*low_filter[0]*low_filter[0] + (1 - AVG_CONST)*low_bucket;
+    low_bucket1 = AVG_CONST*low_filter1[0]*low_filter1[0] + (1 - AVG_CONST)*low_bucket1;
 
     if (low_bucket/BUCKET_NORMALIZE > high_bucket + BUCKET_OFFSET) {
       found_signal = true;
